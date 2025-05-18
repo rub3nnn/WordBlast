@@ -28,7 +28,7 @@ jobs:
       - run: npm install
 
       - name: Recargar PM2 actual
-        run: pm2 reload 3 --update-env
+        run: pm2 reload 2 --update-env
         env:
           CORS_HOST: ${{ secrets.CORS_HOST }}
 
