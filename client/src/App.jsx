@@ -135,6 +135,7 @@ export default function HomePage() {
     // Crear el socket
     const newSocket = io(import.meta.env.VITE_backendUrl, {
       auth: { room: roomCodeRef },
+      timeout: 60000,
     });
 
     // Manejar el estado "connecting" cuando se inicia la conexión
@@ -616,13 +617,13 @@ export default function HomePage() {
           </div>
 
           <h2 className="text-2xl font-bold mb-2">
-            {connectionStatus === "connecting" && "Conectando a los servidores"}
+            {connectionStatus === "connecting" && "Conectando al servidor"}
             {connectionStatus === "disconnected" &&
               "Reconectando con los servidores"}
           </h2>
           <p className="text-gray-400 max-w-md mx-auto">
             {connectionStatus === "connecting" &&
-              "Esto no tomará mucho tiempo. Estamos estableciendo una conexión segura."}
+              "El servidor está despertando del modo reposo. Esto solo tomará unos segundos extra."}
             {connectionStatus === "disconnected" &&
               "¡Vaya! Esto si que nos ha pillado por sorpresa."}
           </p>
