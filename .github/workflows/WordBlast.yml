@@ -1,0 +1,36 @@
+name: WordBlast
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    strategy:
+      matrix:
+        node-version: [22.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cambiar al directorio /server/
+        run: cd server
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - run: npm install
+
+      - name: Recargar PM2 actual
+        run: pm2 reload 3 --update-env
+        env:
+          CORS_HOST: ${{ secrets.CORS_HOST }}
+
+      - name: Guardar PM2 actual
+        run: pm2 save
