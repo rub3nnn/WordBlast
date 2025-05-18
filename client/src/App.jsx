@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Cookies from "js-cookie";
 import {
-  Bomb,
   Play,
   Plus,
   HelpCircle,
@@ -13,7 +12,6 @@ import {
   Volume2,
   Volume1,
   VolumeX,
-  TextCursorInput,
   Users,
   Copy,
   Check,
@@ -41,13 +39,12 @@ export default function HomePage() {
   const [toRoomCode, setToRoomCode] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
   const [shake, setShake] = useState(false);
-  const [volume, setVolume] = useState(50);
+  const [volume, setVolume] = useState(Cookies.get("volume") || 50);
   const inputRefs = [useRef(), useRef(), useRef(), useRef()];
   const [inputWord, setInputWord] = useState(""); // Para almacenar el texto
   const [mainAnimationEnd, setMainAnimationEnd] = useState(false);
   const [roomCode, setRoomCode] = useState("");
   const [copied, setCopied] = useState(false);
-  const [nameInput, setNameInput] = useState({ from: "", after: "" });
   const [showDialog, setShowDialog] = useState({
     show: false,
     title: "",
@@ -87,13 +84,6 @@ export default function HomePage() {
 
     return isMobile;
   };
-
-  useEffect(() => {
-    const savedVolume = Cookies.get("volume");
-    if (savedVolume) {
-      setVolume(Number(savedVolume));
-    }
-  }, []);
 
   useEffect(() => {
     Cookies.set("volume", volume, { expires: 30 }); // La cookie expira en 30 días
@@ -160,6 +150,12 @@ export default function HomePage() {
 
     // Evento cuando el socket se desconecta
     newSocket.on("disconnect", () => {
+      setConnectionStatus("disconnected");
+    });
+
+    // Evento cuando hay un error de conexión
+    newSocket.on("connect_error", (err) => {
+      console.error("Connection error:", err);
       setConnectionStatus("disconnected");
     });
 
@@ -961,7 +957,7 @@ export default function HomePage() {
 
             {
               /* Start Button (Only for host) */
-              player.role === "leader" && (
+              player?.role === "leader" && (
                 <motion.button
                   disabled={readyPlayersNeeded > 0}
                   onClick={() => socket.emit("startGame")}
@@ -1132,12 +1128,12 @@ export default function HomePage() {
 
             {
               /* Ready Button (Only for players) */
-              player.role !== "leader" && (
+              player?.role !== "leader" && (
                 <motion.button
                   onClick={() => socket.emit("getReady")}
                   className={`w-full py-4 rounded-lg flex items-center justify-center gap-2 font-medium
               ${
-                !player.isReady
+                !player?.isReady
                   ? "bg-green-500 hover:bg-green-600"
                   : "bg-gray-700"
               } transition-colors`}
@@ -1145,7 +1141,7 @@ export default function HomePage() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <Play className="w-5 h-5" />
-                  {!player.isReady ? "Listo" : "No listo"}
+                  {!player?.isReady ? "Listo" : "No listo"}
                 </motion.button>
               )
             }
@@ -1168,11 +1164,11 @@ export default function HomePage() {
                   }`;
                 }
 
-                if (player.role !== "leader" && player.isReady) {
+                if (player?.role !== "leader" && player?.isReady) {
                   return "Esperando a que el líder inicie la partida...";
                 }
 
-                if (player.role !== "leader" && !player.isReady) {
+                if (player?.role !== "leader" && !player?.isReady) {
                   return "¡Dale a listo para jugar! Si la partida inicia sin ti, quedarás como espectador";
                 }
 
@@ -1223,7 +1219,7 @@ export default function HomePage() {
                         }
                       }}
                       className={`relative p-4 rounded-lg flex items-center justify-between 
-                      ${player.role === "leader" && "cursor-pointer"}
+                      ${player?.role === "leader" && "cursor-pointer"}
                     ${true ? "bg-gray-800/80" : "bg-gray-800/40"}
                     hover:bg-gray-800/60 transition-colors`}
                     >

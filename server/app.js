@@ -519,7 +519,7 @@ io.on("connection", (socket) => {
 });
 
 // Iniciar servidor
-const PORT = 3000;
+const PORT = 3010;
 server.listen(PORT, () => {
   console.log(`Servidor backend corriendo en http://localhost:${PORT}`);
 });
