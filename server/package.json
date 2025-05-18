@@ -9,7 +9,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^5.0.1",
+    "express": "^5.1.0",
     "natural": "^8.0.1",
     "socket.io": "^4.8.1",
     "socket.io-parser": "^4.2.4",
