@@ -1,10 +1,8 @@
-
-
 <p align="center">
 <img src="https://github.com/user-attachments/assets/b484eb7f-65a0-4ed2-8416-656a63a961f5" alt="Logo Word Blast" width="400" />
 </p>
 
-**WordBlast** es un juego multijugador en tiempo real, inspirado en *BombParty*, en el que los jugadores deben escribir palabras que contengan una sílaba específica antes de que la bomba explote. ¡Pon a prueba tu vocabulario bajo presión!
+**WordBlast** es un juego multijugador en tiempo real, en el que los jugadores deben escribir palabras que contengan una sílaba específica antes de que la bomba explote. ¡Pon a prueba tu vocabulario bajo presión!
 
 ## 🚀 El proyecto desplegado
 
