@@ -9,7 +9,20 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_HOST, // Asegurar conexión con el frontend
+    origin: (origin, callback) => {
+      const allowedDomain = process.env.CORS_HOST;
+      const vercelPattern = /\.secrecynetwork\.vercel\.app$/;
+
+      if (
+        !origin || // permitir desde herramientas locales sin origin
+        origin === allowedDomain ||
+        vercelPattern.test(new URL(origin).hostname)
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST"],
   },
 });
