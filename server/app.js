@@ -11,12 +11,12 @@ const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
       const allowedDomain = process.env.CORS_HOST;
-      const vercelPattern = /\.secrecynetwork\.vercel\.app$/;
+      const vercelPattern = /-secrecynetwork\.vercel\.app$/; // <- Cambiado: ahora busca "-secrecynetwork.vercel.app" al final
 
       if (
         !origin || // permitir desde herramientas locales sin origin
         origin === allowedDomain ||
-        vercelPattern.test(new URL(origin).hostname)
+        (origin && vercelPattern.test(new URL(origin).hostname)) // Verifica si el hostname contiene el patrón
       ) {
         callback(null, true);
       } else {
