@@ -87,8 +87,14 @@ class RoomManager {
       currentPlayer.lives--;
       if (currentPlayer.lives <= 0) {
         currentPlayer.isAlive = false; // Si se quedó sin vidas, marcarlo como muerto
+        // If single player and lives are 0, end the game
+        if (rooms[roomId] && rooms[roomId].isSinglePlayer) { 
+          finishGame(roomId);
+          return; // Stop further actions like calling handleNextPlayer for SP
+        }
       }
-      handleNextPlayer(roomId);
+      // For multiplayer, or if single player still has lives, proceed to next player/turn
+      handleNextPlayer(roomId); 
       console.log(`Temporizador de la sala ${roomId} detenido .`);
     } else {
       console.log(`No hay temporizador en la sala ${roomId}.`);
@@ -167,10 +173,25 @@ function finishGame(roomCode) {
   if (!rooms[roomCode]) return;
   let room = rooms[roomCode];
   room.status = "finished";
-  const player = room.players.find((player) => player.isAlive === true);
-  player.score++;
+
+  if (room.isSinglePlayer) {
+    // Single-player: game ends, player's score might be handled or just game over
+    const player = room.players[0]; // Only one player
+    if (player) { // Player might not exist if room is deleted abruptly
+      // Score can be incremented or handled as needed for single player
+      // player.score++; // Example: increment score if that's desired
+    }
+    sendAudio("audio/gameover.mp3", roomCode); // Or a specific sound for single player game over
+  } else {
+    // Multiplayer: existing logic to find winner
+    const player = room.players.find((player) => player.isAlive === true);
+    if (player) {
+      player.score++;
+    }
+    sendAudio("audio/victory.mp3", roomCode);
+  }
+
   // Emitir estado final del juego
-  sendAudio("audio/victory.mp3", roomCode);
   io.to(roomCode).emit("gameState", room);
   roomManager.stopTimer(roomCode);
   // Esperar 7 segundos y reiniciar la sala a estado "waiting"
@@ -187,6 +208,36 @@ var lastSyllable = "";
 const handleNextPlayer = (roomCode) => {
   if (!rooms[roomCode]) return;
   let room = rooms[roomCode];
+
+  // 🔽 START SINGLE PLAYER LOGIC 🔽
+  if (room.isSinglePlayer) {
+    // Ensure player is alive
+    const player = room.players[0]; // Only one player
+    if (!player || !player.isAlive) {
+      finishGame(roomCode);
+      return;
+    }
+
+    // Generate new syllable
+    if (room.syllable === lastSyllable) {
+      room.syllable = getRandomSyllable();
+    } else {
+      lastSyllable = room.syllable;
+    }
+    room.currentPlayerIndex = player.id; // Current player is always the single player
+    // Update player state (reset current word, keep active)
+    room.players = room.players.map((p) => ({
+      ...p,
+      isActive: true, // Single player is always active
+      currentWord: "",
+    }));
+
+    io.to(roomCode).emit("gameState", room);
+    roomManager.startTimer(roomCode); // Restart timer for the same player
+    return; // End execution for single player
+  }
+  // 🔼 END SINGLE PLAYER LOGIC 🔼
+
   const playersAlive = room.players.filter((player) => player.isAlive);
   if (playersAlive.length === 1) {
     finishGame(roomCode);
@@ -268,7 +319,7 @@ io.on("connection", (socket) => {
   socket.currentRoom = null;
 
   // Unir jugador a una sala
-  const joinPlayer = (roomCode, isLeader, nick) => {
+  const joinPlayer = (roomCode, isLeader, nick, isSinglePlayer = false) => {
     if (!rooms[roomCode]) {
       rooms[roomCode] = {
         status: "waiting",
@@ -280,11 +331,17 @@ io.on("connection", (socket) => {
         maxlives: 3,
         roundTime: 10,
         keyboard: "default",
+        isSinglePlayer: isSinglePlayer, // Añadir flag de un jugador
       };
       words[roomCode] = [];
     }
 
     let room = rooms[roomCode];
+
+    // Si es un jugador único, establecer como líder y listo
+    if (isSinglePlayer && room.players.length === 0) {
+      isLeader = true;
+    }
 
     let newPlayer = {
       id: socket.userId,
@@ -294,7 +351,7 @@ io.on("connection", (socket) => {
       isAlive: false,
       currentWord: "",
       score: 0,
-      isReady: false,
+      isReady: isSinglePlayer ? true : false, // Si es un jugador, está listo automáticamente
       inGame: false,
       socketId: socket.id,
     };
@@ -354,9 +411,9 @@ io.on("connection", (socket) => {
   });
 
   // Crear sala
-  socket.on("createRoom", (nick) => {
+  socket.on("createRoom", ({ nick, isSinglePlayer }) => {
     const roomCode = generateRoomCode();
-    joinPlayer(roomCode, true, nick);
+    joinPlayer(roomCode, true, nick, isSinglePlayer);
   });
 
   // Unirse a sala
@@ -447,21 +504,37 @@ io.on("connection", (socket) => {
     words[socket.currentRoom] = [];
 
     room.syllable = getRandomSyllable();
-    startingPlayerId = room.players[0].id;
+    let startingPlayerId = room.players[0].id; // Por defecto el primer jugador
     room.currentPlayerIndex = startingPlayerId; // Asignar el ID del primer jugador
-    room.players = room.players.map((player) => {
-      if (player.isReady || player.role === "leader") {
-        return {
-          ...player,
-          isActive: player.id === startingPlayerId,
-          isAlive: true,
-          lives: room.lives,
-          maxLives: room.maxLives,
-          currentWord: "",
-        };
-      }
-      return player;
-    });
+
+    if (room.isSinglePlayer) {
+      // Lógica específica para un jugador
+      const singlePlayer = room.players[0];
+      singlePlayer.isActive = true;
+      singlePlayer.isAlive = true;
+      singlePlayer.lives = room.lives;
+      singlePlayer.maxLives = room.maxLives;
+      singlePlayer.currentWord = "";
+      startingPlayerId = singlePlayer.id; // Asegurar que el ID es del único jugador
+      room.players = [singlePlayer]; // Asegurar que solo hay un jugador en la lista
+    } else {
+      // Lógica para múltiples jugadores (existente)
+      room.players = room.players.map((player) => {
+        if (player.isReady || player.role === "leader") {
+          return {
+            ...player,
+            isActive: player.id === startingPlayerId,
+            isAlive: true,
+            lives: room.lives,
+            maxLives: room.maxLives,
+            currentWord: "",
+          };
+        }
+        return player;
+      });
+    }
+    room.currentPlayerIndex = startingPlayerId; // Re-asignar por si cambió
+
     sendAudio("audio/start.wav", socket.currentRoom);
     io.to(socket.currentRoom).emit("gameState", room);
     roomManager.startTimer(socket.currentRoom); // Iniciar el temporizador

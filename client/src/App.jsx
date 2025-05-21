@@ -45,6 +45,7 @@ export default function HomePage() {
   const [mainAnimationEnd, setMainAnimationEnd] = useState(false);
   const [roomCode, setRoomCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [isCreatingSinglePlayerRoom, setIsCreatingSinglePlayerRoom] = useState(false); // New state for single player
   const [showDialog, setShowDialog] = useState({
     show: false,
     title: "",
@@ -309,9 +310,14 @@ export default function HomePage() {
     }
   }, [currentView, connectionStatus]);
 
-  const handleCreateRoom = () => {
-    socket.emit("createRoom", user.username);
-    console.log("Creando sala con nombre:", user.username);
+  const handleCreateRoom = (isSinglePlayer = false) => {
+    socket.emit("createRoom", { nick: user.username, isSinglePlayer });
+    console.log(`Creando sala con nombre: ${user.username}, es un jugador: ${isSinglePlayer}`);
+  };
+
+  const handleCreateSinglePlayerRoom = () => {
+    setIsCreatingSinglePlayerRoom(true);
+    setCurrentView("create");
   };
 
   const handleCopyCode = () => {
@@ -372,6 +378,11 @@ export default function HomePage() {
       icon: Plus,
       text: "Crear una Sala",
       action: () => setCurrentView("create"),
+    },
+    {
+      icon: Play, // Or any other suitable icon
+      text: "Modo 1 Jugador",
+      action: () => handleCreateSinglePlayerRoom(),
     },
     {
       icon: HelpCircle,
@@ -894,9 +905,14 @@ export default function HomePage() {
   );
 
   const renderWaitingRoom = () => {
-    const playersNeeded = MIN_PLAYERS - room.players.length;
-    const readyPlayersNeeded =
-      MIN_PLAYERS - room.players.filter((player) => player.isReady).length - 1;
+    const isSinglePlayer = room.isSinglePlayer; // Check if it's a single-player room
+
+    // Adjust playersNeeded and readyPlayersNeeded for single-player
+    const playersNeeded = isSinglePlayer ? 0 : MIN_PLAYERS - room.players.length;
+    const readyPlayersNeeded = isSinglePlayer
+      ? 0
+      : MIN_PLAYERS - room.players.filter((player) => player.isReady).length - 1;
+
     return (
       <motion.div
         key="waiting"
@@ -917,59 +933,63 @@ export default function HomePage() {
           </motion.button>
 
           <div className="space-y-6 bg-gray-800/50 p-6 rounded-lg sticky top-8">
-            <div>
-              <h2 className="text-xl font-medium text-gray-400 mb-4">
-                Código de sala
-              </h2>
-              <motion.button
-                onClick={handleCopyCode}
-                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gray-800 
-             rounded-lg hover:bg-gray-700 transition-colors group"
-                whileTap={{ scale: 0.95 }}
-              >
-                <span className="text-3xl font-bold tracking-wider">
-                  {roomCode}
-                </span>
-                {copied ? (
-                  <Check className="w-5 h-5 text-green-500" />
-                ) : (
-                  <Copy className="w-5 h-5 text-gray-400 group-hover:text-gray-300" />
-                )}
-              </motion.button>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-medium text-gray-400">Jugadores</h2>
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-400">
-                    {room.players.length}/{MAX_PLAYERS}
-                  </span>
+            {!isSinglePlayer && ( // Hide Room Code and Player Count for Single Player
+              <>
+                <div>
+                  <h2 className="text-xl font-medium text-gray-400 mb-4">
+                    Código de sala
+                  </h2>
+                  <motion.button
+                    onClick={handleCopyCode}
+                    className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gray-800 
+                 rounded-lg hover:bg-gray-700 transition-colors group"
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <span className="text-3xl font-bold tracking-wider">
+                      {roomCode}
+                    </span>
+                    {copied ? (
+                      <Check className="w-5 h-5 text-green-500" />
+                    ) : (
+                      <Copy className="w-5 h-5 text-gray-400 group-hover:text-gray-300" />
+                    )}
+                  </motion.button>
                 </div>
-              </div>
-              <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-red-500 transition-all duration-500"
-                  style={{ width: `${(room.players.length / 16) * 100}%` }}
-                />
-              </div>
-            </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-xl font-medium text-gray-400">Jugadores</h2>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-gray-400" />
+                      <span className="text-gray-400">
+                        {room.players.length}/{MAX_PLAYERS}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-red-500 transition-all duration-500"
+                      style={{ width: `${(room.players.length / 16) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             {
-              /* Start Button (Only for host) */
-              player?.role === "leader" && (
+              /* Start Button (Only for host or single player) */
+              (player?.role === "leader" || isSinglePlayer) && (
                 <motion.button
-                  disabled={readyPlayersNeeded > 0}
+                  disabled={!isSinglePlayer && readyPlayersNeeded > 0} // Disabled if multiplayer and players not ready
                   onClick={() => socket.emit("startGame")}
                   className={`w-full py-4 rounded-lg flex items-center justify-center gap-2 font-medium
               ${
-                readyPlayersNeeded <= 0
+                (isSinglePlayer || readyPlayersNeeded <= 0)
                   ? "bg-red-500 hover:bg-red-600"
                   : "bg-gray-700 cursor-not-allowed"
               } transition-colors`}
-                  whileHover={readyPlayersNeeded <= 0 && { scale: 1.02 }}
-                  whileTap={readyPlayersNeeded <= 0 && { scale: 0.98 }}
+                  whileHover={(isSinglePlayer || readyPlayersNeeded <= 0) && { scale: 1.02 }}
+                  whileTap={(isSinglePlayer || readyPlayersNeeded <= 0) && { scale: 0.98 }}
                 >
                   <Play className="w-5 h-5" />
                   Comenzar Partida
@@ -984,7 +1004,8 @@ export default function HomePage() {
                 </h2>
                 <button
                   onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                  disabled={!isSinglePlayer && player?.role !== "leader"} // Disable for non-leader in multiplayer
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Settings className="w-5 h-5 text-gray-400" />
                 </button>
@@ -1021,7 +1042,7 @@ export default function HomePage() {
                               roundTime: Number(e.target.value),
                             }))
                           }
-                          disabled={player.role !== "leader"}
+                          disabled={!isSinglePlayer && player.role !== "leader"}
                           className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer
                              [&::-webkit-slider-thumb]:appearance-none
                              [&::-webkit-slider-thumb]:w-4
@@ -1060,7 +1081,7 @@ export default function HomePage() {
                               lives: Number(e.target.value),
                             }))
                           }
-                          disabled={player.role !== "leader"}
+                          disabled={!isSinglePlayer && player.role !== "leader"}
                           className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer
                              [&::-webkit-slider-thumb]:appearance-none
                              [&::-webkit-slider-thumb]:w-4
@@ -1085,7 +1106,7 @@ export default function HomePage() {
                                 keyboard: "default",
                               }))
                             }
-                            disabled={player.role !== "leader"}
+                            disabled={!isSinglePlayer && player.role !== "leader"}
                             className={`p-2 rounded-lg text-sm font-medium transition-colors
                                ${
                                  gameSettings.keyboard === "default"
@@ -1103,7 +1124,7 @@ export default function HomePage() {
                                 keyboard: "device",
                               }))
                             }
-                            disabled={player.role !== "leader"}
+                            disabled={!isSinglePlayer && player.role !== "leader"}
                             className={`p-2 rounded-lg text-sm font-medium transition-colors
                                ${
                                  gameSettings.keyboard === "device"
@@ -1128,8 +1149,8 @@ export default function HomePage() {
             </div>
 
             {
-              /* Ready Button (Only for players) */
-              player?.role !== "leader" && (
+              /* Ready Button (Only for players, hide in single player) */
+              !isSinglePlayer && player?.role !== "leader" && (
                 <motion.button
                   onClick={() => socket.emit("getReady")}
                   className={`w-full py-4 rounded-lg flex items-center justify-center gap-2 font-medium
@@ -1149,6 +1170,9 @@ export default function HomePage() {
 
             <p className="text-center text-sm text-gray-400">
               {(() => {
+                if (isSinglePlayer) {
+                  return "¡Todo listo! Presiona 'Comenzar Partida' para jugar.";
+                }
                 if (playersNeeded > 0) {
                   return `Esperando a que se una${
                     playersNeeded > 1 ? "n" : ""
@@ -1156,7 +1180,6 @@ export default function HomePage() {
                     playersNeeded > 1 ? "es" : ""
                   } más...`;
                 }
-
                 if (readyPlayersNeeded > 0) {
                   return `Esperando a que al menos ${readyPlayersNeeded} jugador${
                     readyPlayersNeeded > 1 ? "es" : ""
@@ -1164,15 +1187,12 @@ export default function HomePage() {
                     readyPlayersNeeded > 1 ? "s" : ""
                   }`;
                 }
-
                 if (player?.role !== "leader" && player?.isReady) {
                   return "Esperando a que el líder inicie la partida...";
                 }
-
                 if (player?.role !== "leader" && !player?.isReady) {
                   return "¡Dale a listo para jugar! Si la partida inicia sin ti, quedarás como espectador";
                 }
-
                 if (
                   room.players.every(
                     (player) => player.role === "leader" || player.isReady
@@ -1180,85 +1200,86 @@ export default function HomePage() {
                 ) {
                   return 'Todos los jugadores están listos. Pulsa "Comenzar Partida" para iniciar...';
                 }
-
                 return 'Pulsa "Comenzar Partida" para iniciar... (Los jugadores que no están listos quedarán como espectadores)';
               })()}
             </p>
           </div>
         </div>
 
-        {/* Right Column - Players List */}
-        <div className="flex-1 mt-6 md:mt-0">
-          <div className="bg-gray-800/50 rounded-lg p-6 md:h-[calc(100vh-8rem)] flex flex-col">
-            <h3 className="text-lg font-medium text-gray-400 mb-4">
-              Jugadores en sala
-            </h3>
-            <div
-              className={`flex-1 overflow-y-auto 
+        {/* Right Column - Players List (Hide for Single Player) */}
+        {!isSinglePlayer && (
+          <div className="flex-1 mt-6 md:mt-0">
+            <div className="bg-gray-800/50 rounded-lg p-6 md:h-[calc(100vh-8rem)] flex flex-col">
+              <h3 className="text-lg font-medium text-gray-400 mb-4">
+                Jugadores en sala
+              </h3>
+              <div
+                className={`flex-1 overflow-y-auto 
                   scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent ${
                     !isMobile && "min-h-[400px]"
                   }`}
-            >
-              <div className="space-y-3 p-0.5">
-                {/* Added padding to prevent border cut-off */}
-                <AnimatePresence mode="popLayout">
-                  {room.players.map((playerelement) => (
-                    <motion.div
-                      key={playerelement.id}
-                      layout
-                      data-player-id={playerelement.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      onClick={() => {
-                        if (player.role === "leader") {
-                          setSelectedPlayer(
-                            selectedPlayer?.id === playerelement.id
-                              ? null
-                              : playerelement
-                          );
-                        }
-                      }}
-                      className={`relative p-4 rounded-lg flex items-center justify-between 
+              >
+                <div className="space-y-3 p-0.5">
+                  {/* Added padding to prevent border cut-off */}
+                  <AnimatePresence mode="popLayout">
+                    {room.players.map((playerelement) => (
+                      <motion.div
+                        key={playerelement.id}
+                        layout
+                        data-player-id={playerelement.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        onClick={() => {
+                          if (player.role === "leader") {
+                            setSelectedPlayer(
+                              selectedPlayer?.id === playerelement.id
+                                ? null
+                                : playerelement
+                            );
+                          }
+                        }}
+                        className={`relative p-4 rounded-lg flex items-center justify-between 
                       ${player?.role === "leader" && "cursor-pointer"}
                     ${true ? "bg-gray-800/80" : "bg-gray-800/40"}
                     hover:bg-gray-800/60 transition-colors`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {playerelement.role === "leader" && (
-                          <Crown className="w-5 h-5 text-yellow-500" />
-                        )}
-                        <span className="font-medium">
-                          {playerelement.name}
-                        </span>
-                      </div>
-
-                      {playerelement.role !== "leader" && (
+                      >
                         <div className="flex items-center gap-3">
-                          <motion.div
-                            animate={
-                              playerelement.isReady
-                                ? {
-                                    backgroundColor: "rgb(34 197 94)", // green-500
-                                  }
-                                : {
-                                    backgroundColor: "rgb(75 85 99)", // gray-600
-                                  }
-                            }
-                            className="h-2 w-2 rounded-full"
-                          />
-                          <span className="text-sm text-gray-400">
-                            {playerelement.isReady ? "Listo" : "Esperando"}
+                          {playerelement.role === "leader" && (
+                            <Crown className="w-5 h-5 text-yellow-500" />
+                          )}
+                          <span className="font-medium">
+                            {playerelement.name}
                           </span>
                         </div>
-                      )}
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
+
+                        {playerelement.role !== "leader" && (
+                          <div className="flex items-center gap-3">
+                            <motion.div
+                              animate={
+                                playerelement.isReady
+                                  ? {
+                                      backgroundColor: "rgb(34 197 94)", // green-500
+                                    }
+                                  : {
+                                      backgroundColor: "rgb(75 85 99)", // gray-600
+                                    }
+                              }
+                              className="h-2 w-2 rounded-full"
+                            />
+                            <span className="text-sm text-gray-400">
+                              {playerelement.isReady ? "Listo" : "Esperando"}
+                            </span>
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </motion.div>
     );
   };
@@ -1290,31 +1311,33 @@ export default function HomePage() {
             transition={{ duration: 0.3, ease: "easeOut" }}
             className="fixed top-0 left-1/2 transform -translate-x-1/2 z-40 mt-2"
           >
-            <div className="bg-gray-800/90 backdrop-blur-sm text-white px-5 py-3 rounded-lg shadow-lg border border-gray-700/50 flex items-center gap-4">
-              {room.players.length - playersReady.length > 0 && (
+            {!room.isSinglePlayer && ( // Only show this info bar in multiplayer
+              <div className="bg-gray-800/90 backdrop-blur-sm text-white px-5 py-3 rounded-lg shadow-lg border border-gray-700/50 flex items-center gap-4">
+                {room.players.length - playersReady.length > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-gray-700/50 rounded-full">
+                    <View className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm font-medium">
+                      {room.players.length - playersReady.length}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 px-3 py-1 bg-gray-700/50 rounded-full">
-                  <View className="w-4 h-4 text-gray-400" />
+                  <Users className="w-4 h-4 text-green-400" />
                   <span className="text-sm font-medium">
-                    {room.players.length - playersReady.length}
+                    {room.players.length -
+                      (room.players.length - playersReady.length)}
                   </span>
                 </div>
-              )}
 
-              <div className="flex items-center gap-2 px-3 py-1 bg-gray-700/50 rounded-full">
-                <Users className="w-4 h-4 text-green-400" />
-                <span className="text-sm font-medium">
-                  {room.players.length -
-                    (room.players.length - playersReady.length)}
-                </span>
+                <div className="flex items-center gap-2 px-3 py-1 bg-gray-700/50 rounded-full">
+                  <RectangleEllipsis className="w-4 h-4 text-yellow-400" />
+                  <span className="text-sm font-medium tracking-wider">
+                    {roomCode}
+                  </span>
+                </div>
               </div>
-
-              <div className="flex items-center gap-2 px-3 py-1 bg-gray-700/50 rounded-full">
-                <RectangleEllipsis className="w-4 h-4 text-yellow-400" />
-                <span className="text-sm font-medium tracking-wider">
-                  {roomCode}
-                </span>
-              </div>
-            </div>
+            )}
           </motion.div>
           {isMobile ? (
             <GameBoardMobile
