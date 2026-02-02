@@ -7,6 +7,15 @@ const natural = require("natural");
 require("dotenv").config();
 const app = express();
 const server = http.createServer(app);
+const cors = require("cors");
+
+app.use(cors());
+
+app.use((req, res, next) => {
+  console.log(`📡 PETICIÓN RECIBIDA: [${req.method}] ${req.url}`);
+  next();
+});
+
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -26,7 +35,7 @@ const words = {};
 const MAX_PLAYERS = 16;
 
 app.get("/", (req, res) => {
-  res.send(rooms);
+  res.send("HOLA");
 });
 
 class RoomManager {
@@ -519,6 +528,6 @@ io.on("connection", (socket) => {
 
 // Iniciar servidor
 const PORT = 3000;
-server.listen(PORT, () => {
-  console.log(`Servidor backend corriendo en http://localhost:${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Servidor backend accesible en red: http://0.0.0.0:${PORT}`);
 });
