@@ -12,6 +12,7 @@ import {
   Volume2,
   Volume1,
   VolumeX,
+  TextCursorInput,
   Users,
   Copy,
   Check,
@@ -29,14 +30,15 @@ import { GameBoard } from "./GameUI.jsx";
 import { GameBoardMobile } from "./GameUIMobile.jsx";
 import WinnerScreen from "./winnerScreen.jsx";
 import { MobileKeyboard } from "./mobile-keyboard.jsx";
-import { UserButton, useUser } from "@clerk/clerk-react";
 
-export default function HomePage() {
+export default function App() {
   const MIN_PLAYERS = 2;
   const MAX_PLAYERS = 16;
   const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [currentView, setCurrentView] = useState("menu"); // menu, room, create, howTo, settings
   const [toRoomCode, setToRoomCode] = useState(["", "", "", ""]);
+  const [toNickname, setToNickname] = useState("");
+  const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
   const [shake, setShake] = useState(false);
   const [volume, setVolume] = useState(Cookies.get("volume") || 50);
@@ -45,6 +47,7 @@ export default function HomePage() {
   const [mainAnimationEnd, setMainAnimationEnd] = useState(false);
   const [roomCode, setRoomCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [nameInput, setNameInput] = useState({ from: "", to: "" });
   const [showDialog, setShowDialog] = useState({
     show: false,
     title: "",
@@ -70,7 +73,6 @@ export default function HomePage() {
     lives: 3,
     keyboard: "default",
   });
-  const { user, isSignedIn, SignIn } = useUser();
 
   const useIsMobile = (breakpoint = 768) => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint);
@@ -84,6 +86,24 @@ export default function HomePage() {
 
     return isMobile;
   };
+
+  useEffect(() => {
+    const savedNickname = Cookies.get("nickname");
+    if (savedNickname) {
+      setNickname(savedNickname);
+    }
+    const savedVolume = Cookies.get("volume");
+    if (savedVolume) {
+      setVolume(Number(savedVolume));
+    }
+  }, []);
+
+  // Efecto para guardar el nickname en la cookie cada vez que cambie
+  useEffect(() => {
+    if (nickname) {
+      Cookies.set("nickname", nickname, { expires: 30 }); // La cookie expira en 30 días
+    }
+  }, [nickname]);
 
   useEffect(() => {
     Cookies.set("volume", volume, { expires: 30 }); // La cookie expira en 30 días
@@ -134,7 +154,6 @@ export default function HomePage() {
   useEffect(() => {
     // Crear el socket
     const newSocket = io(import.meta.env.VITE_backendUrl, {
-      auth: { room: roomCodeRef },
       timeout: 60000,
     });
 
@@ -218,7 +237,7 @@ export default function HomePage() {
         players: prevRoom.players.map((player) =>
           player.id === data.userId
             ? { ...player, currentWord: data.text }
-            : player
+            : player,
         ),
       }));
     });
@@ -266,6 +285,19 @@ export default function HomePage() {
     }
   };
 
+  const handleNicknameChange = () => {
+    if (toNickname.length < 3) {
+      setError("El nombre debe tener al menos 3 caracteres");
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+    if (toNickname) {
+      setNickname(toNickname);
+    }
+    setCurrentView(nameInput.to);
+  };
+
   const handleDigitChange = (index, value) => {
     if (value.length > 1) return;
     const newCode = [...toRoomCode];
@@ -293,7 +325,7 @@ export default function HomePage() {
       setTimeout(() => setShake(false), 500);
       return;
     }
-    socket.emit("joinRoom", { roomCode: code, nick: user.username });
+    socket.emit("joinRoom", { roomCode: code, nick: nickname });
     console.log("Uniendo a sala:", code);
   };
 
@@ -310,8 +342,12 @@ export default function HomePage() {
   }, [currentView, connectionStatus]);
 
   const handleCreateRoom = () => {
-    socket.emit("createRoom", user.username);
-    console.log("Creando sala con nombre:", user.username);
+    if (!nickname) {
+      setNameInput({ from: "menu", to: "create" });
+      return setCurrentView("name");
+    }
+    socket.emit("createRoom", nickname);
+    console.log("Creando sala con nombre:", nickname);
   };
 
   const handleCopyCode = () => {
@@ -365,12 +401,12 @@ export default function HomePage() {
   const menuItems = [
     {
       icon: Play,
-      text: "Unirse a una sala",
+      text: "Jugar",
       action: () => setCurrentView("room"),
     },
     {
       icon: Plus,
-      text: "Crear una Sala",
+      text: "Crear Sala",
       action: () => setCurrentView("create"),
     },
     {
@@ -386,9 +422,6 @@ export default function HomePage() {
   ];
 
   const PlayerOptionsModal = ({ player: playerE, onClose }) => {
-    if (!isSignedIn) {
-      return <SignIn />;
-    }
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -416,8 +449,8 @@ export default function HomePage() {
                   {playerE.role === "leader"
                     ? "Líder de la sala"
                     : playerE.isReady
-                    ? "Listo para jugar"
-                    : "Esperando..."}
+                      ? "Listo para jugar"
+                      : "Esperando..."}
                 </p>
               </div>
             </div>
@@ -691,7 +724,10 @@ export default function HomePage() {
   );
 
   const renderRoomInput = () => {
-    if (
+    if (!nickname) {
+      setNameInput({ from: "menu", to: "room" });
+      return setCurrentView("name");
+    } else if (
       connectionStatus !== "connectedhide" &&
       connectionStatus !== "connected"
     ) {
@@ -731,7 +767,7 @@ export default function HomePage() {
                 key={index}
                 ref={inputRefs[index]}
                 type="text"
-                inputmode="numeric"
+                inputMode="numeric"
                 maxLength={1}
                 value={digit}
                 onChange={(e) => handleDigitChange(index, e.target.value)}
@@ -775,6 +811,69 @@ export default function HomePage() {
       return renderConnecting();
     }
   };
+
+  const renderNameInput = () => (
+    <motion.div
+      key="name-input"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="space-y-8"
+    >
+      <motion.button
+        onClick={() => setCurrentView(nameInput.from)}
+        className="flex items-center text-gray-400 hover:text-white transition-colors"
+        whileHover={{ x: -4 }}
+      >
+        <ArrowLeft className="w-5 h-5 mr-2" />
+        Volver al Menú
+      </motion.button>
+
+      <div className="text-center">
+        <h2 className="text-2xl font-bold mb-2">Antes de comenzar</h2>
+        <p className="text-gray-400">Elige un nombre para empezar</p>
+      </div>
+
+      <motion.div
+        className="space-y-4"
+        animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
+        transition={{ duration: 0.4 }}
+      >
+        <input
+          type="text"
+          value={toNickname}
+          onChange={(e) => setToNickname(e.target.value)}
+          placeholder="Tu nombre"
+          maxLength={15}
+          className="w-full p-4 text-lg bg-gray-800 border-2 border-gray-700 rounded-lg 
+                   focus:border-red-500 focus:outline-none transition-colors"
+        />
+        <p className="text-gray-400 text-sm">
+          {15 - toNickname.length} caracteres restantes
+        </p>
+      </motion.div>
+
+      {error && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-red-500 text-center"
+        >
+          {error}
+        </motion.p>
+      )}
+
+      <motion.button
+        onClick={handleNicknameChange}
+        className="w-full bg-red-500 hover:bg-red-600 p-4 rounded-lg font-medium
+                 transition-colors duration-200"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+      >
+        Continuar
+      </motion.button>
+    </motion.div>
+  );
 
   const renderHowToPlay = () => (
     <motion.div
@@ -879,6 +978,21 @@ export default function HomePage() {
                      [&::-webkit-slider-thumb]:rounded-full
                      [&::-webkit-slider-thumb]:cursor-pointer"
           />
+        </div>
+
+        {/* Change Nickname */}
+        <div className="flex items-center justify-between">
+          <span className="text-lg font-medium">Cambiar Nombre</span>
+          <span className="text-lg font-medium text-red-400">{nickname}</span>
+          <button
+            onClick={() => {
+              setNameInput({ from: "settings", to: "settings" });
+              setCurrentView("name");
+            }}
+            className="p-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <TextCursorInput className="w-6 h-6 text-gray-400" />
+          </button>
         </div>
 
         {/* Language Selection - For future implementation */}
@@ -1045,7 +1159,7 @@ export default function HomePage() {
                                   className="w-4 h-4 text-red-500"
                                   fill="currentColor"
                                 />
-                              )
+                              ),
                             )}
                           </div>
                         </div>
@@ -1175,7 +1289,7 @@ export default function HomePage() {
 
                 if (
                   room.players.every(
-                    (player) => player.role === "leader" || player.isReady
+                    (player) => player.role === "leader" || player.isReady,
                   )
                 ) {
                   return 'Todos los jugadores están listos. Pulsa "Comenzar Partida" para iniciar...';
@@ -1215,7 +1329,7 @@ export default function HomePage() {
                           setSelectedPlayer(
                             selectedPlayer?.id === playerelement.id
                               ? null
-                              : playerelement
+                              : playerelement,
                           );
                         }
                       }}
@@ -1277,7 +1391,7 @@ export default function HomePage() {
     }
     if (room.status === "inGame") {
       const playersReady = room.players.filter(
-        (player) => player.isReady || player.role === "leader"
+        (player) => player.isReady || player.role === "leader",
       );
       return (
         <div>
@@ -1428,7 +1542,7 @@ export default function HomePage() {
             onConfirm={() => {
               handlePlayerAction(
                 showConfirmation.action,
-                showConfirmation.player
+                showConfirmation.player,
               );
             }}
             onCancel={() =>
@@ -1461,8 +1575,8 @@ export default function HomePage() {
                   connectionStatus === "connected"
                     ? "bg-green-500/20"
                     : connectionStatus === "disconnected"
-                    ? "bg-red-500/20"
-                    : "bg-yellow-500/20"
+                      ? "bg-red-500/20"
+                      : "bg-yellow-500/20"
                 }`}
             >
               {connectionStatus === "connecting" && (
@@ -1478,24 +1592,13 @@ export default function HomePage() {
                 {connectionStatus === "connecting"
                   ? "Conectando..."
                   : connectionStatus === "connected"
-                  ? "Conectado"
-                  : "Desconectado"}
+                    ? "Conectado"
+                    : "Desconectado"}
               </span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="fixed bottom-4 right-4 z-50">
-        <UserButton
-          showName={true}
-          appearance={{
-            elements: {
-              userButtonBox:
-                "px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center transition-colors transition-scale duration-200 group hover:scale-[1.02]",
-            },
-          }}
-        />
-      </div>
     </>
   );
 }

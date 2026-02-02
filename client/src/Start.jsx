@@ -5,8 +5,6 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment } from "@react-three/drei";
 import { motion, AnimatePresence } from "framer-motion";
 import Bomb from "./Bomb.jsx";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
-import { Layout } from "lucide-react";
 
 export default function Start({
   explosionComplete,

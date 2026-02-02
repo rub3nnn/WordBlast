@@ -66,7 +66,7 @@ class RoomManager {
     // Asignar un tiempo aleatorio
     this.rooms[roomId].time = this.getRandomTime();
     console.log(
-      `Sala ${roomId}: Temporizador iniciado con ${this.rooms[roomId].time}s`
+      `Sala ${roomId}: Temporizador iniciado con ${this.rooms[roomId].time}s`,
     );
 
     this.intervals[roomId] = setInterval(() => {
@@ -92,7 +92,7 @@ class RoomManager {
       delete this.intervals[roomId];
       sendAudio("/audio/fail.wav", roomId);
       const currentPlayer = rooms[roomId].players.find(
-        (player) => player.id === rooms[roomId].currentPlayerIndex
+        (player) => player.id === rooms[roomId].currentPlayerIndex,
       );
       if (!currentPlayer) {
         return;
@@ -214,7 +214,7 @@ const handleNextPlayer = (roomCode) => {
 
   // Obtener el índice del jugador actual
   const currentPlayerIndex = room.players.findIndex(
-    (player) => player.id === room.currentPlayerIndex
+    (player) => player.id === room.currentPlayerIndex,
   );
 
   // Buscar el siguiente jugador que cumpla las condiciones
@@ -268,11 +268,10 @@ io.on("connection", (socket) => {
   const userId = uuidv4();
   console.log("Cliente conectado:", userId);
   socket.userId = userId;
-  console.log(socket.handshake.auth.room.current);
-  if (
-    socket.handshake.auth.room.current &&
-    !rooms[socket.handshake.auth.room.current]
-  ) {
+
+  // Verificar si hay una sala en la autenticación y si existe
+  const roomCode = socket.handshake.auth?.room?.current;
+  if (roomCode && !rooms[roomCode]) {
     socket.emit("kicked", {
       title: "La sala no existe",
       message: "Parece que la sala en la que estabas ya no existe",
@@ -417,14 +416,14 @@ io.on("connection", (socket) => {
   socket.on("kickPlayer", (playerId) => {
     if (!rooms[socket.currentRoom]) return;
     const player = rooms[socket.currentRoom].players.find(
-      (player) => player.id === socket.userId
+      (player) => player.id === socket.userId,
     );
     if (player?.role !== "leader") return;
     kickPlayer(
       socket.currentRoom,
       playerId,
       "Has sido expulsado",
-      "El líder te ha expulsado de la sala"
+      "El líder te ha expulsado de la sala",
     );
   });
 
@@ -486,7 +485,7 @@ io.on("connection", (socket) => {
     if (!room) return;
 
     const currentPlayer = room.players.find(
-      (player) => player.id === room.currentPlayerIndex
+      (player) => player.id === room.currentPlayerIndex,
     );
 
     currentPlayer.currentWord = data.text;
