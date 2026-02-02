@@ -30,6 +30,8 @@ import { GameBoard } from "./GameUI.jsx";
 import { GameBoardMobile } from "./GameUIMobile.jsx";
 import WinnerScreen from "./winnerScreen.jsx";
 import { MobileKeyboard } from "./mobile-keyboard.jsx";
+import { StatusBar, Style } from "@capacitor/status-bar";
+import { Capacitor } from "@capacitor/core";
 
 export default function App() {
   const MIN_PLAYERS = 2;
@@ -73,6 +75,17 @@ export default function App() {
     lives: 3,
     keyboard: "default",
   });
+
+  const configurarUI = async () => {
+    await StatusBar.setStyle({ style: Style.Dark }); // Texto blanco (batería, hora)
+    //await StatusBar.setBackgroundColor({ color: "#101828" }); // PON AQUÍ TU COLOR DE FONDO HEX
+  };
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      configurarUI();
+    }
+  }, []);
 
   const useIsMobile = (breakpoint = 768) => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint);
@@ -176,6 +189,7 @@ export default function App() {
     // Evento cuando hay un error de conexión
     newSocket.on("connect_error", (err) => {
       console.error("Connection error:", err);
+      //alert(err.message);
       setConnectionStatus("disconnected");
     });
 
@@ -449,8 +463,8 @@ export default function App() {
                   {playerE.role === "leader"
                     ? "Líder de la sala"
                     : playerE.isReady
-                      ? "Listo para jugar"
-                      : "Esperando..."}
+                    ? "Listo para jugar"
+                    : "Esperando..."}
                 </p>
               </div>
             </div>
@@ -1575,8 +1589,8 @@ export default function App() {
                   connectionStatus === "connected"
                     ? "bg-green-500/20"
                     : connectionStatus === "disconnected"
-                      ? "bg-red-500/20"
-                      : "bg-yellow-500/20"
+                    ? "bg-red-500/20"
+                    : "bg-yellow-500/20"
                 }`}
             >
               {connectionStatus === "connecting" && (
@@ -1592,8 +1606,8 @@ export default function App() {
                 {connectionStatus === "connecting"
                   ? "Conectando..."
                   : connectionStatus === "connected"
-                    ? "Conectado"
-                    : "Desconectado"}
+                  ? "Conectado"
+                  : "Desconectado"}
               </span>
             </div>
           </motion.div>

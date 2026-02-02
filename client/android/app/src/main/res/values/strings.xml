@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">WordBlast</string>
+    <string name="title_activity_main">WordBlast</string>
+    <string name="package_name">com.rub3n.wordblast</string>
+    <string name="custom_url_scheme">com.rub3n.wordblast</string>
+</resources>
